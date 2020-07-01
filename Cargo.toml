@@ -1,0 +1,13 @@
+[package]
+name = "dicom-test"
+version = "0.1.0"
+authors = ["Robin Lange <robin.langenc@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+dicom = "0.2"
+anyhow = "1.0"
+png = "0.16"
+jpeg-decoder = "0.1"
