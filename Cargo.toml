@@ -11,6 +11,7 @@ dicom = "0.2"
 anyhow = "1.0"
 png = "0.16"
 jpeg-decoder = "0.1"
+iced = { version = "0.1", features = ["image", "svg"]}
 
 
 [[bin]]

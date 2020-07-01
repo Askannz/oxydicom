@@ -71,3 +71,34 @@ pub fn write_image(image_data: &DecodedImageData, path: &Path) -> Result<()> {
 
     Ok(())
 }
+
+#[allow(non_snake_case)]
+pub fn convert_to_BGRA(image_data: &DecodedImageData) -> Result<DecodedImageData> {
+
+    let DecodedImageData { 
+        pixel_data, bytes_per_sample, samples_per_pixel, .. 
+    } = image_data;
+
+    if *bytes_per_sample != 1 || *samples_per_pixel != 3{
+        return Err(anyhow!("Unsupported image type"))
+    }
+
+    let rgba_data: Vec<u8> = pixel_data
+        .chunks_exact(3)
+        .flat_map(|chunk| {
+            let [r, g, b] = match chunk {
+                [r, g, b] => [*r, *g, *b],
+                _ => panic!()
+            };
+            vec![b, g, r, 255]
+        })
+        .collect();
+
+    Ok(DecodedImageData {
+        w: image_data.w,
+        h: image_data.h,
+        samples_per_pixel: *samples_per_pixel,
+        bytes_per_sample: *bytes_per_sample,
+        pixel_data: rgba_data
+    })
+}
