@@ -11,3 +11,12 @@ dicom = "0.2"
 anyhow = "1.0"
 png = "0.16"
 jpeg-decoder = "0.1"
+
+
+[[bin]]
+name = "dicom2png"
+path = "src/dicom2png.rs"
+
+[[bin]]
+name = "benchmark"
+path = "src/benchmark.rs"
