@@ -6,7 +6,8 @@ use dicom::core::dictionary::DataDictionary;
 use iced::{
     Container, Element, Sandbox, Settings, Image, Row,
     Text, Scrollable, scrollable, Button, Column, button,
-    Length, HorizontalAlignment, VerticalAlignment, Align
+    Length, HorizontalAlignment, VerticalAlignment, Align,
+    Application, executor, Command, window, Space
 };
 use iced::image::Handle;
 
@@ -17,16 +18,54 @@ use utils::{DecodedImageData, convert_to_BGRA, Dicom};
 use decoding::get_image;
 
 pub fn main() {
-    App::run(Settings::default())
+
+    let mut args = std::env::args().skip(1);
+
+    let input_path = PathBuf::from(
+        args.next().expect("Not enough arguments"));
+
+    let filepath = input_path.as_os_str().to_str().unwrap().to_owned();
+
+    let dicom = open_file(input_path.as_os_str()).unwrap();
+    let table = get_dicom_table(&dicom);
+    let image_data = get_image(dicom).unwrap();
+
+    let DecodedImageData { w, h, .. } = image_data;
+
+    let flags = Flags { 
+        image_data,
+        table,
+        filepath
+    };
+
+    let settings = Settings {
+        flags: flags,
+        window: window::Settings {
+            size: (w, h + 60),
+            resizable: true,
+            decorations: true,
+            ..Default::default()
+        },
+        default_font: None,
+        antialiasing: true
+    };
+
+    App::run(settings)
 }
 
 struct App {
     handle: Handle,
     filepath: String,
-    table_string: String,
+    table: Vec<(String, String)>,
     scroll_state: scrollable::State,
     button_state: button::State,
     show_tags: bool
+}
+
+struct Flags {
+    filepath: String,
+    image_data: DecodedImageData,
+    table: Vec<(String, String)>
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -34,42 +73,42 @@ enum Message {
     ButtonPressed
 }
 
-impl Sandbox for App {
+impl Application for App {
+    type Executor = executor::Null;
     type Message = Message;
+    type Flags = Flags;
 
-    fn new() -> Self {
+    fn new(flags: Flags) -> (Self, Command<Self::Message>) {
 
-        let mut args = std::env::args().skip(1);
+        let Flags { filepath, image_data, table } = flags;
 
-        let input_path = PathBuf::from(
-            args.next().expect("Not enough arguments"));
-    
-        let dicom = open_file(input_path.as_os_str()).unwrap();
-        let table_string = get_dicom_table_string(&dicom);
-        let image_data = get_image(dicom).unwrap();
         let image_data_bgra = convert_to_BGRA(&image_data).unwrap();
 
         let DecodedImageData { w, h, pixel_data, .. } = image_data_bgra;
         let handle = Handle::from_pixels(w, h, pixel_data);
 
-        App { 
+        let app = App { 
             handle,
-            filepath: input_path.as_os_str().to_str().unwrap().to_owned(),
-            table_string,
+            filepath,
+            table,
             scroll_state: scrollable::State::new(),
             button_state: button::State::new(),
             show_tags: false
-        }
+        };
+
+        (app, Command::none())
     }
 
     fn title(&self) -> String {
         String::from("DICOM")
     }
 
-    fn update(&mut self, message: Message) {
+    fn update(&mut self, message: Message) -> Command<Self::Message> {
         match message {
             Message::ButtonPressed => self.show_tags = !self.show_tags
         }
+
+        Command::none()
     }
 
     fn view(&mut self) -> Element<Message> {
@@ -87,31 +126,55 @@ impl Sandbox for App {
                         .horizontal_alignment(HorizontalAlignment::Center)
                         .vertical_alignment(VerticalAlignment::Center)
                 )
-                .padding(5)
+                //.padding(5)
             )
-            .align_items(Align::Center)
-            .padding(5);
+            .align_items(Align::Center);
+            //.padding(5);
 
         let content: Element<Message> = if self.show_tags {
+
+            let tags_col_element: Vec<Element<Message>> = self.table.iter().map(|(tag_str, _)| {
+                Text::new(tag_str)
+                    .into()
+            }).collect();
+
+            let vals_col_element: Vec<Element<Message>> = self.table.iter().map(|(_, val_str)| {
+                Text::new(val_str)
+                    .into()
+            }).collect();
+
+            let row = Row::new()
+                .push(
+                    Column::with_children(tags_col_element)
+                        .width(Length::FillPortion(2))
+                )
+                .push(
+                    Column::with_children(vals_col_element)
+                        .width(Length::FillPortion(2))
+                );
+
             Scrollable::new(&mut self.scroll_state)
-                .push(Text::new(self.table_string.as_str()))
+                .push(row)
+                .width(Length::Fill)
+                .height(Length::Shrink)
                 .into()
+
         } else {
             Container::new(image)
-            //Text::new("AAAA".to_owned())
                 .into()
         };
 
         Column::new()
             .push(header)
             .push(content)
-            //.width(Length::from(600))
+            .align_items(Align::Center)
+            .width(Length::Fill)
             .into()
     }
 } 
 
 
-fn get_dicom_table_string(dicom: &Dicom) -> String {
+fn get_dicom_table(dicom: &Dicom) -> Vec<(String, String)> {
 
     let dict = StandardDataDictionary;
 
@@ -147,12 +210,5 @@ fn get_dicom_table_string(dicom: &Dicom) -> String {
 
     }).collect();
 
-    let max_tag_len = table.iter().map(|(tag_str, _)| tag_str.len()).max().unwrap();
-
-    let string_vec: Vec<String> = table
-        .iter()
-        .map(|(tag_str, val_str)| format!("{:width$} : {}", tag_str, val_str, width = max_tag_len))
-        .collect();
-    
-    string_vec.join("\n")
+    table
 }
