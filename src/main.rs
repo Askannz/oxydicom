@@ -188,6 +188,8 @@ fn get_formatted_list(depth: usize, root: &MemDicom) -> Vec<(String, String)> {
     let dict = StandardDataDictionary;
     let mut table = Vec::<(String, String)>::new();
 
+    let pad_depth = |s: String| format!("{}{}", " ".repeat(4*depth), s);
+
     for element in root {
 
         let tag = element.header().tag;
@@ -197,18 +199,18 @@ fn get_formatted_list(depth: usize, root: &MemDicom) -> Vec<(String, String)> {
             .map(|entry| entry.alias)
             .unwrap_or("Unknown");
 
-        let tag_str = format!("{}{} {}", " ".repeat(4*depth), tag, tag_name_str);
+        let tag_str = pad_depth(format!("{} {}", tag, tag_name_str));
         let val_str = format_value(element.value());
 
         table.push((tag_str, val_str));
 
         if let Value::Sequence { items, .. } = element.value() {
             for item in items {
-                table.push(("---".to_owned(), "---".to_owned()));
+                table.push((" -".to_owned(), " -".to_owned()));
                 let mut sub_table = get_formatted_list(depth + 1, item);
                 table.append(&mut sub_table);
             }
-            table.push(("---".to_owned(), "---".to_owned()));
+            table.push((" -".to_owned(), " -".to_owned()));
         }
     }
 
@@ -229,7 +231,9 @@ fn format_value<P>(value: &Value<MemDicom, P>) -> String {
 
 fn format_primitive(prim_val: &PrimitiveValue) -> String {
 
-    match prim_val {
+    const MAX_LEN: usize = 40;
+
+    let mut s = match prim_val {
 
         PrimitiveValue::Empty => "<empty>".to_owned(),
         PrimitiveValue::Strs(arr) => format_array(arr),
@@ -247,7 +251,13 @@ fn format_primitive(prim_val: &PrimitiveValue) -> String {
         PrimitiveValue::Date(arr) => format_array(arr),
         PrimitiveValue::DateTime(arr) => format_array(arr),
         PrimitiveValue::Time(arr) => format_array(arr)
+    };
+
+    if s.len() > MAX_LEN {
+        s = format!("{} <...>", &s[..MAX_LEN]);
     }
+
+    s
 }
 
 fn format_array<T: Display>(arr: &C<T>) -> String {
