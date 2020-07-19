@@ -10,14 +10,16 @@ pub type Dicom = RootDicomObject<InMemDicomObject<StandardDataDictionary>>;
 pub enum Encoding {
     RAW,
     RLE,
-    JPEG
+    JPEG,
+    JPEG2000
 }
 
 #[allow(non_camel_case_types)]
 pub enum PhotoInterp {
     RGB,
     Palette(Vec<Vec<u16>>),
-    YBR_FULL_422
+    YBR_FULL_422,
+    MONOCHROME2
 }
 
 pub struct EncodedImageData {
@@ -79,20 +81,29 @@ pub fn convert_to_BGRA(image_data: &DecodedImageData) -> Result<DecodedImageData
         pixel_data, bytes_per_sample, samples_per_pixel, .. 
     } = image_data;
 
-    if *bytes_per_sample != 1 || *samples_per_pixel != 3{
-        return Err(anyhow!("Unsupported image type"))
-    }
+    let rgba_data: Vec<u8> = match (*bytes_per_sample, *samples_per_pixel)  {
 
-    let rgba_data: Vec<u8> = pixel_data
-        .chunks_exact(3)
-        .flat_map(|chunk| {
-            let [r, g, b] = match chunk {
-                [r, g, b] => [*r, *g, *b],
-                _ => panic!()
-            };
-            vec![b, g, r, 255]
-        })
-        .collect();
+        (1, 3) => pixel_data
+                .chunks_exact(3)
+                .flat_map(|chunk| {
+                    let [r, g, b] = match chunk {
+                        [r, g, b] => [*r, *g, *b],
+                        _ => panic!()
+                    };
+                    vec![b, g, r, 255]
+                })
+                .collect(),
+
+        (1, 1) => pixel_data
+                .iter()
+                .flat_map(|v| vec![*v, *v, *v, 255])
+                .collect(),  
+                
+        _ => return Err(anyhow!(
+            "Unsupported image type: {} bytes per sample, {} samples per pixel",
+            *bytes_per_sample, *samples_per_pixel
+        ))
+    };
 
     Ok(DecodedImageData {
         w: image_data.w,

@@ -39,7 +39,7 @@ pub fn get_encoded_image_data(dicom: &Dicom) -> Result<EncodedImageData> {
     let encoding = match uid {
         "1.2.840.10008.1.2.1"       => Encoding::RAW,
         "1.2.840.10008.1.2.4.50"    => Encoding::JPEG,
-        "1.2.840.10008.1.2.4.90"    => unimplemented!(),
+        "1.2.840.10008.1.2.4.90"    => Encoding::JPEG2000,
         "1.2.840.10008.1.2.5"       => Encoding::RLE,
         val => return Err(anyhow!("Unhandled transfer syntax: {}", val))
     };
@@ -78,6 +78,7 @@ pub fn get_encoded_image_data(dicom: &Dicom) -> Result<EncodedImageData> {
         "RGB" => PhotoInterp::RGB,
         "PALETTECOLOR" => PhotoInterp::Palette(get_palettes(dicom)?),
         "YBR_FULL_422" => PhotoInterp::YBR_FULL_422,
+        "MONOCHROME2" => PhotoInterp::MONOCHROME2,
         val => return Err(anyhow!("Unhandled photometric interpretation: {}", val))
     };
 

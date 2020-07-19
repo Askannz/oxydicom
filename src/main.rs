@@ -1,13 +1,13 @@
 use std::path::PathBuf;
 use dicom::object::open_file;
-use dicom::core::value::{Value, PrimitiveValue};
+use dicom::core::value::Value;
 use dicom::dictionary_std::StandardDataDictionary;
 use dicom::core::dictionary::DataDictionary;
 use iced::{
-    Container, Element, Sandbox, Settings, Image, Row,
+    Container, Element, Settings, Image, Row,
     Text, Scrollable, scrollable, Button, Column, button,
     Length, HorizontalAlignment, VerticalAlignment, Align,
-    Application, executor, Command, window, Space
+    Application, executor, Command, window
 };
 use iced::image::Handle;
 

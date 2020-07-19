@@ -1,11 +1,10 @@
 use std::convert::TryInto;
+use jpeg2000::decode::{Codec, DecodeConfig};
 use anyhow::{Result, anyhow};
 use crate::utils::{Dicom, EncodedImageData, DecodedImageData, Encoding, PhotoInterp};
 
 mod dicom_parsing;
 use dicom_parsing::get_encoded_image_data;
-
-
 
 
 pub fn get_image(dicom: Dicom) -> Result<DecodedImageData> {
@@ -21,6 +20,7 @@ fn decode_image(encoded_image_data: EncodedImageData) -> Result<DecodedImageData
         Encoding::RAW => encoded_image_data.pixel_data.clone(),
         Encoding::RLE => decode_RLE(&encoded_image_data)?,
         Encoding::JPEG => decode_JPEG(&encoded_image_data)?,
+        Encoding::JPEG2000 => decode_JPEG2000(&encoded_image_data)?
     };
 
     let (decoded_bytes_2, new_samples_per_pixel) = match encoded_image_data.photo_interp {
@@ -29,7 +29,8 @@ fn decode_image(encoded_image_data: EncodedImageData) -> Result<DecodedImageData
             (decoded_bytes_2, 3)
         },
         PhotoInterp::RGB => (decoded_bytes_1, encoded_image_data.samples_per_pixel),
-        PhotoInterp::YBR_FULL_422 => (decoded_bytes_1, encoded_image_data.samples_per_pixel) // TESTING !
+        PhotoInterp::YBR_FULL_422 => (decoded_bytes_1, encoded_image_data.samples_per_pixel), // TESTING !
+        PhotoInterp::MONOCHROME2 => (decoded_bytes_1, encoded_image_data.samples_per_pixel)
     };
 
     Ok(DecodedImageData {
@@ -47,6 +48,34 @@ fn decode_JPEG(encoded_image_data: &EncodedImageData) -> Result<Vec<u8>> {
     let mut decoder = jpeg_decoder::Decoder::new(encoded_image_data.pixel_data.as_slice());
     let decoded_pixel_data = decoder.decode()?;
     Ok(decoded_pixel_data)
+}
+
+#[allow(non_snake_case)]
+fn decode_JPEG2000(encoded_image_data: &EncodedImageData) -> Result<Vec<u8>> {
+
+    let EncodedImageData { samples_per_pixel, bytes_per_sample, .. } = encoded_image_data;
+
+    let dynamic_image = jpeg2000::decode::from_memory(
+        encoded_image_data.pixel_data.as_slice(),
+        Codec::JP2,
+        DecodeConfig {
+            default_colorspace: None,
+            discard_level: 0,
+        },
+        None,
+    )?;
+
+    let pixel_data: Vec<u8> = match (samples_per_pixel, bytes_per_sample) {
+        (1, 1) => dynamic_image.to_luma().into_vec(),
+        (3, 1) => dynamic_image.to_rgb().into_vec(),
+        (4, 1) => dynamic_image.to_rgba().into_vec(),
+        _ => return Err(anyhow!(
+            "JPEG2000 output {} samples per pixel, {}  bytes per sample is unsupported",
+            samples_per_pixel, bytes_per_sample
+        ))
+    };
+
+    Ok(pixel_data)
 }
 
 fn map_to_palette(encoded_image_data: &EncodedImageData, decoded_bytes: Vec<u8>) -> Result<Vec<u8>> {
