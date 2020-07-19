@@ -1,6 +1,8 @@
 use std::path::PathBuf;
 use std::fmt::{Debug, Display};
+use dicom::core::Tag;
 use dicom::object::open_file;
+use dicom::object::mem::InMemDicomObject;
 use dicom::core::value::{Value, PrimitiveValue, C};
 use dicom::dictionary_std::StandardDataDictionary;
 use dicom::core::dictionary::DataDictionary;
@@ -177,10 +179,16 @@ impl Application for App {
 
 
 fn get_dicom_table(dicom: &Dicom) -> Vec<(String, String)> {
+    let root = dicom.clone().into_inner();
+    get_formatted_list(0, &root)
+}
+
+fn get_formatted_list(depth: usize, root: &MemDicom) -> Vec<(String, String)> {
 
     let dict = StandardDataDictionary;
+    let mut table = Vec::<(String, String)>::new();
 
-    let table: Vec<(String, String)> = dicom.clone().into_iter().map(|element| {
+    for element in root {
 
         let tag = element.header().tag;
 
@@ -189,42 +197,56 @@ fn get_dicom_table(dicom: &Dicom) -> Vec<(String, String)> {
             .map(|entry| entry.alias)
             .unwrap_or("Unknown");
 
-        let tag_str = format!("{} {}", tag, tag_name_str);
+        let tag_str = format!("{}{} {}", " ".repeat(4*depth), tag, tag_name_str);
         let val_str = format_value(element.value());
 
-        (tag_str, val_str)
+        table.push((tag_str, val_str));
 
-    }).collect();
+        if let Value::Sequence { items, .. } = element.value() {
+            for item in items {
+                table.push(("---".to_owned(), "---".to_owned()));
+                let mut sub_table = get_formatted_list(depth + 1, item);
+                table.append(&mut sub_table);
+            }
+            table.push(("---".to_owned(), "---".to_owned()));
+        }
+    }
 
     table
 }
 
-fn format_value<I, P>(value: &Value<I, P>) -> String {
+type MemDicom = InMemDicomObject<StandardDataDictionary>;
+
+fn format_value<P>(value: &Value<MemDicom, P>) -> String {
 
     match value {
 
-        Value::Primitive(val) => match val {
-
-            PrimitiveValue::Empty => "<empty>".to_owned(),
-            PrimitiveValue::Strs(arr) => format_array(arr),
-            PrimitiveValue::Str(s) => s.clone(),
-            PrimitiveValue::Tags(arr) => format_array(arr),
-            PrimitiveValue::U8(arr) => format_array(arr),
-            PrimitiveValue::I16(arr) => format_array(arr),
-            PrimitiveValue::U16(arr) => format_array(arr),
-            PrimitiveValue::I32(arr) => format_array(arr),
-            PrimitiveValue::U32(arr) => format_array(arr),
-            PrimitiveValue::I64(arr) => format_array(arr),
-            PrimitiveValue::U64(arr) => format_array(arr),
-            PrimitiveValue::F32(arr) => format_array(arr),
-            PrimitiveValue::F64(arr) => format_array(arr),
-            PrimitiveValue::Date(arr) => format_array(arr),
-            PrimitiveValue::DateTime(arr) => format_array(arr),
-            PrimitiveValue::Time(arr) => format_array(arr)
-        },
-
-        Value::Sequence { .. } => "<sequence>".to_owned(), // TODO: properly implement this
+        Value::Primitive(prim_val) => format_primitive(prim_val),
+        Value::Sequence { .. } => "<sequence>".to_owned(),
         Value::PixelSequence { .. } => "<pixel sequence>".to_owned()
+    }
+}
+
+fn format_primitive(prim_val: &PrimitiveValue) -> String {
+
+    match prim_val {
+
+        PrimitiveValue::Empty => "<empty>".to_owned(),
+        PrimitiveValue::Strs(arr) => format_array(arr),
+        PrimitiveValue::Str(s) => s.clone(),
+        PrimitiveValue::Tags(arr) => format_array(arr),
+        PrimitiveValue::U8(arr) => format_array(arr),
+        PrimitiveValue::I16(arr) => format_array(arr),
+        PrimitiveValue::U16(arr) => format_array(arr),
+        PrimitiveValue::I32(arr) => format_array(arr),
+        PrimitiveValue::U32(arr) => format_array(arr),
+        PrimitiveValue::I64(arr) => format_array(arr),
+        PrimitiveValue::U64(arr) => format_array(arr),
+        PrimitiveValue::F32(arr) => format_array(arr),
+        PrimitiveValue::F64(arr) => format_array(arr),
+        PrimitiveValue::Date(arr) => format_array(arr),
+        PrimitiveValue::DateTime(arr) => format_array(arr),
+        PrimitiveValue::Time(arr) => format_array(arr)
     }
 }
 
