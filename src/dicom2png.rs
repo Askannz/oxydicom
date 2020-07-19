@@ -18,7 +18,7 @@ fn main() -> Result<()> {
         args.next().ok_or(anyhow!("Not enough arguments"))?);
 
     let dicom = open_file(input_path.as_os_str())?;
-    let decoded_image_data = get_image(dicom)?;
+    let decoded_image_data = get_image(&dicom)?;
     write_image(&decoded_image_data, output_path.as_path())?;
 
     Ok(())

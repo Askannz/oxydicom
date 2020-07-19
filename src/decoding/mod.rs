@@ -1,62 +1,57 @@
 use std::convert::TryInto;
 use jpeg2000::decode::{Codec, DecodeConfig};
 use anyhow::{Result, anyhow};
-use crate::utils::{Dicom, EncodedImageData, DecodedImageData, Encoding, PhotoInterp};
+use crate::utils::{Dicom, EncodedImage, RawImage, Encoding, Format, Palettes};
 
 mod dicom_parsing;
 use dicom_parsing::get_encoded_image_data;
 
 
-pub fn get_image(dicom: Dicom) -> Result<DecodedImageData> {
-    let encoded_image_data = get_encoded_image_data(&dicom)?;
-    let decoded_image_data = decode_image(encoded_image_data)?;
-    Ok(decoded_image_data)
+pub fn get_image(dicom: &Dicom) -> Result<RawImage> {
+    let encoded_image = get_encoded_image_data(dicom)?;
+    let image = decode_image(&encoded_image)?;
+    Ok(image)
 }
 
 
-fn decode_image(encoded_image_data: EncodedImageData) -> Result<DecodedImageData> {
+fn decode_image(encoded_image: &EncodedImage) -> Result<RawImage> {
 
-    let decoded_bytes_1 = match encoded_image_data.encoding {
-        Encoding::RAW => encoded_image_data.pixel_data.clone(),
-        Encoding::RLE => decode_RLE(&encoded_image_data)?,
-        Encoding::JPEG => decode_JPEG(&encoded_image_data)?,
-        Encoding::JPEG2000 => decode_JPEG2000(&encoded_image_data)?
+    let EncodedImage { 
+        target_format, encoding, palettes, bytes
+    } = encoded_image;
+
+    let mut format = target_format.clone();
+    let mut decoded_bytes = match encoding {
+        Encoding::RAW => bytes.clone(),
+        Encoding::RLE => decode_RLE(&encoded_image)?,
+        Encoding::JPEG => decode_JPEG(&encoded_image)?,
+        Encoding::JPEG2000 => decode_JPEG2000(&encoded_image)?
     };
 
-    let (decoded_bytes_2, new_samples_per_pixel) = match encoded_image_data.photo_interp {
-        PhotoInterp::Palette(_) => {
-            let decoded_bytes_2 = map_to_palette(&encoded_image_data, decoded_bytes_1)?;
-            (decoded_bytes_2, 3)
-        },
-        PhotoInterp::RGB => (decoded_bytes_1, encoded_image_data.samples_per_pixel),
-        PhotoInterp::YBR_FULL_422 => (decoded_bytes_1, encoded_image_data.samples_per_pixel), // TESTING !
-        PhotoInterp::MONOCHROME2 => (decoded_bytes_1, encoded_image_data.samples_per_pixel)
-    };
+    if let Some(ref palettes) = palettes {
+        decoded_bytes = map_to_palette(&decoded_bytes, palettes, format.channel_depth)?;
+        format.channels = 3;
+        format.channel_depth = 2;
+    }
 
-    Ok(DecodedImageData {
-        w: encoded_image_data.w,
-        h: encoded_image_data.h,
-        samples_per_pixel: new_samples_per_pixel,
-        bytes_per_sample: encoded_image_data.bytes_per_sample,
-        pixel_data: decoded_bytes_2
-    })
+    Ok(RawImage { format, bytes: decoded_bytes })
 }
 
 #[allow(non_snake_case)]
-fn decode_JPEG(encoded_image_data: &EncodedImageData) -> Result<Vec<u8>> {
+fn decode_JPEG(encoded_image: &EncodedImage) -> Result<Vec<u8>> {
 
-    let mut decoder = jpeg_decoder::Decoder::new(encoded_image_data.pixel_data.as_slice());
+    let mut decoder = jpeg_decoder::Decoder::new(encoded_image.bytes.as_slice());
     let decoded_pixel_data = decoder.decode()?;
     Ok(decoded_pixel_data)
 }
 
 #[allow(non_snake_case)]
-fn decode_JPEG2000(encoded_image_data: &EncodedImageData) -> Result<Vec<u8>> {
+fn decode_JPEG2000(encoded_image: &EncodedImage) -> Result<Vec<u8>> {
 
-    let EncodedImageData { samples_per_pixel, bytes_per_sample, .. } = encoded_image_data;
+    let Format { channels, channel_depth, .. } = encoded_image.target_format;
 
     let dynamic_image = jpeg2000::decode::from_memory(
-        encoded_image_data.pixel_data.as_slice(),
+        encoded_image.bytes.as_slice(),
         Codec::JP2,
         DecodeConfig {
             default_colorspace: None,
@@ -65,44 +60,30 @@ fn decode_JPEG2000(encoded_image_data: &EncodedImageData) -> Result<Vec<u8>> {
         None,
     )?;
 
-    let pixel_data: Vec<u8> = match (samples_per_pixel, bytes_per_sample) {
+    let pixel_data: Vec<u8> = match (channels, channel_depth) {
         (1, 1) => dynamic_image.to_luma().into_vec(),
         (3, 1) => dynamic_image.to_rgb().into_vec(),
         (4, 1) => dynamic_image.to_rgba().into_vec(),
         _ => return Err(anyhow!(
-            "JPEG2000 output {} samples per pixel, {}  bytes per sample is unsupported",
-            samples_per_pixel, bytes_per_sample
+            "JPEG2000 output is unsupported: {} channels of depth {} bytes",
+            channels, channel_depth
         ))
     };
 
     Ok(pixel_data)
 }
 
-fn map_to_palette(encoded_image_data: &EncodedImageData, decoded_bytes: Vec<u8>) -> Result<Vec<u8>> {
+fn map_to_palette(bytes: &Vec<u8>, palettes: &Palettes, channel_depth: u32) -> Result<Vec<u8>> {
 
-    let palettes = match &encoded_image_data.photo_interp {
-        PhotoInterp::Palette(palettes) => palettes,
-        _ => panic!()
-    };
-
-    let EncodedImageData { samples_per_pixel, bytes_per_sample, .. } = encoded_image_data;
-
-    if *samples_per_pixel != 1 { 
-        return Err(anyhow!(
-            "Image requires palette mapping but has {} > 1 samples per pixel",
-            samples_per_pixel
-        ))
-    }
-
-    if *bytes_per_sample != 1 && *bytes_per_sample != 2 {
+    if channel_depth != 1 && channel_depth != 2 {
         return Err(anyhow!(
             "Unsupported bit depth: {} (1 and 2 supported)",
-            *bytes_per_sample
+            channel_depth
         ))  
     }
 
-    let d = *bytes_per_sample as usize;
-    let mapped_bytes: Vec<u8> = decoded_bytes
+    let d = channel_depth as usize;
+    let mapped_bytes: Vec<u8> = bytes
         .chunks_exact(d)
         .map(|v| match d {
             1 => u8::from_be_bytes([v[0]]) as usize,
@@ -126,23 +107,23 @@ fn map_to_palette(encoded_image_data: &EncodedImageData, decoded_bytes: Vec<u8>)
 }
 
 #[allow(non_snake_case)]
-fn decode_RLE(encoded_data: &EncodedImageData) -> Result<Vec<u8>> {
+fn decode_RLE(encoded_data: &EncodedImage) -> Result<Vec<u8>> {
 
-    let EncodedImageData { pixel_data: encoded_pixel_data, .. } = encoded_data;
+    let EncodedImage { bytes, .. } = encoded_data;
 
     /*
         Decoding segments
     */
 
-    let mut offsets = decode_header(&encoded_pixel_data)?;
-    offsets.push(encoded_pixel_data.len());
+    let mut offsets = decode_header(&bytes)?;
+    offsets.push(bytes.len());
     let nb_segments = offsets.len();
 
     let mut decoded_segments = Vec::new();
     for i in 0..nb_segments-1 {
         let o1 = offsets[i];
         let o2 = offsets[i+1];
-        let segment_data = &encoded_pixel_data[o1..o2];
+        let segment_data = &bytes[o1..o2];
         decoded_segments.push(decode_segment(segment_data)?);
     }
 

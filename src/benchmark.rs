@@ -7,7 +7,7 @@ use anyhow::{Result, anyhow};
 mod utils;
 mod decoding;
 
-use utils::DecodedImageData;
+use utils::RawImage;
 use decoding::get_image;
 
 fn main() -> Result<()> {
@@ -31,15 +31,15 @@ fn main() -> Result<()> {
             let t0 = Instant::now();
             let dicom = open_file(dicom_path.as_os_str())?;
             let t1 = Instant::now();
-            let decoded_image_data = get_image(dicom)?;
-            let DecodedImageData { pixel_data, .. } = decoded_image_data;
+            let decoded_image_data = get_image(&dicom)?;
+            let RawImage { bytes, .. } = decoded_image_data;
             let t2 = Instant::now();
 
             let dt1 = ((t1 - t0).as_millis() as f32) / 1000.0;
             let dt2 = ((t2 - t1).as_millis() as f32) / 1000.0;
 
             println!("  {}", filename);
-            println!("    {} bytes", pixel_data.len());
+            println!("    {} bytes", bytes.len());
             println!("    Opening  : {}s", dt1);
             println!("    Decoding : {}s", dt2);
         }

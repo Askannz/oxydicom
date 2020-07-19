@@ -14,7 +14,7 @@ use iced::image::Handle;
 mod utils;
 mod decoding;
 
-use utils::{DecodedImageData, convert_to_BGRA, Dicom};
+use utils::{Format, RawImage, convert_to_BGRA, Dicom};
 use decoding::get_image;
 
 pub fn main() {
@@ -28,12 +28,12 @@ pub fn main() {
 
     let dicom = open_file(input_path.as_os_str()).unwrap();
     let table = get_dicom_table(&dicom);
-    let image_data = get_image(dicom).unwrap();
+    let image = get_image(&dicom).unwrap();
 
-    let DecodedImageData { w, h, .. } = image_data;
+    let Format { w, h, .. } = image.format;
 
     let flags = Flags { 
-        image_data,
+        image,
         table,
         filepath
     };
@@ -64,7 +64,7 @@ struct App {
 
 struct Flags {
     filepath: String,
-    image_data: DecodedImageData,
+    image: RawImage,
     table: Vec<(String, String)>
 }
 
@@ -80,12 +80,13 @@ impl Application for App {
 
     fn new(flags: Flags) -> (Self, Command<Self::Message>) {
 
-        let Flags { filepath, image_data, table } = flags;
+        let Flags { filepath, image, table } = flags;
 
-        let image_data_bgra = convert_to_BGRA(&image_data).unwrap();
+        let image_data_bgra = convert_to_BGRA(&image).unwrap();
 
-        let DecodedImageData { w, h, pixel_data, .. } = image_data_bgra;
-        let handle = Handle::from_pixels(w, h, pixel_data);
+        let RawImage { format, bytes } = image_data_bgra;
+        let Format { h, w, .. } = format;
+        let handle = Handle::from_pixels(w, h, bytes);
 
         let app = App { 
             handle,

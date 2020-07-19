@@ -2,10 +2,10 @@ use dicom::object::Tag;
 use dicom::core::value::{Value, PrimitiveValue};
 use anyhow::{Result, anyhow};
 
-use crate::utils::{EncodedImageData, Encoding, PhotoInterp, Dicom};
+use crate::utils::{EncodedImage, Encoding, Dicom, Format, Palettes};
 
 
-pub fn get_encoded_image_data(dicom: &Dicom) -> Result<EncodedImageData> {
+pub fn get_encoded_image_data(dicom: &Dicom) -> Result<EncodedImage> {
 
     let get_int_value = |tag| match dicom.element(tag)?.value() {
 
@@ -48,10 +48,10 @@ pub fn get_encoded_image_data(dicom: &Dicom) -> Result<EncodedImageData> {
         Pixel data
     */
 
-    let pixel_data = match dicom.element(Tag(0x7FE0, 0x0010))?.value() {
+    let pixel_bytes = match dicom.element(Tag(0x7FE0, 0x0010))?.value() {
 
         Value::Primitive(primitive_val) => match primitive_val {
-            PrimitiveValue::U8(pixel_data) => pixel_data.as_slice(),
+            PrimitiveValue::U8(pixel_bytes) => pixel_bytes.as_slice(),
             PrimitiveValue::U16(_) => unimplemented!(),
             _ => return Err(anyhow!("Unexpected pixel data type"))
         },
@@ -64,7 +64,7 @@ pub fn get_encoded_image_data(dicom: &Dicom) -> Result<EncodedImageData> {
         val => return Err(anyhow!("Unhandled value type: {:?}", val))
     };
 
-    let pixel_data = pixel_data.to_vec();
+    let pixel_bytes = pixel_bytes.to_vec();
 
     /*
         Photometric interpretation
@@ -74,21 +74,25 @@ pub fn get_encoded_image_data(dicom: &Dicom) -> Result<EncodedImageData> {
     let mut photo_interp_str = photo_interp_str.trim_end_matches(char::from(0)).to_owned(); // Get rid of null terminators
     photo_interp_str.retain(|c| !c.is_whitespace()); // Get rid of whitespaces
 
-    let photo_interp = match photo_interp_str.as_ref() {
-        "RGB" => PhotoInterp::RGB,
-        "PALETTECOLOR" => PhotoInterp::Palette(get_palettes(dicom)?),
-        "YBR_FULL_422" => PhotoInterp::YBR_FULL_422,
-        "MONOCHROME2" => PhotoInterp::MONOCHROME2,
-        val => return Err(anyhow!("Unhandled photometric interpretation: {}", val))
+    let palettes = match photo_interp_str.as_ref() {
+        "PALETTECOLOR" => Some(get_palettes(dicom)?),
+        _ => None
     };
 
-    Ok(EncodedImageData { 
-        w, h, samples_per_pixel, bytes_per_sample, 
-        encoding, pixel_data, photo_interp
+    Ok(EncodedImage { 
+
+        target_format: Format {
+            w, h,
+            channels: samples_per_pixel,
+            channel_depth: bytes_per_sample
+        },
+        encoding,
+        palettes,
+        bytes: pixel_bytes
     })
 }
 
-fn get_palettes(dicom: &Dicom) -> Result<Vec<Vec<u16>>> {
+fn get_palettes(dicom: &Dicom) -> Result<Palettes> {
 
     const TAGS_MAP: [Tag; 3] = [
         Tag(0x0028, 0x1201), // RED
@@ -96,7 +100,7 @@ fn get_palettes(dicom: &Dicom) -> Result<Vec<Vec<u16>>> {
         Tag(0x0028, 0x1203)  // BLUE
     ];
 
-    let mut palettes: Vec<Vec<u16>> = Vec::new();
+    let mut palettes: Palettes = Vec::new();
 
     for i in 0..3 {
 
