@@ -13,6 +13,7 @@ use iced::{
     Application, executor, Command, window, Color, Background
 };
 use iced::image::Handle;
+use clipboard::{ClipboardProvider, ClipboardContext};
 
 mod utils;
 mod decoding;
@@ -63,7 +64,8 @@ struct App {
     scroll_state: scrollable::State,
     show_tags_button_state: button::State,
     table_buttons_states: Vec<(button::State, button::State)>,
-    show_tags: bool
+    show_tags: bool,
+    clipoard: ClipboardContext
 }
 
 struct Flags {
@@ -72,10 +74,10 @@ struct Flags {
     table: Vec<(String, String)>
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 enum Message {
-    ButtonPressed,
-    Ignore
+    TagsTogglePressed,
+    TableCellPressed(String)
 }
 
 impl Application for App {
@@ -104,7 +106,8 @@ impl Application for App {
             scroll_state: scrollable::State::new(),
             show_tags_button_state: button::State::new(),
             table_buttons_states,
-            show_tags: false
+            show_tags: false,
+            clipoard: clipboard::ClipboardProvider::new().unwrap()
         };
 
         (app, Command::none())
@@ -116,8 +119,8 @@ impl Application for App {
 
     fn update(&mut self, message: Message) -> Command<Self::Message> {
         match message {
-            Message::ButtonPressed => self.show_tags = !self.show_tags,
-            _ => ()
+            Message::TagsTogglePressed => self.show_tags = !self.show_tags,
+            Message::TableCellPressed(txt) => self.clipoard.set_contents(txt).unwrap()
         }
 
         Command::none()
@@ -130,7 +133,7 @@ impl Application for App {
         let header = Row::new()
             .push(
                 Button::new(&mut self.show_tags_button_state, Text::new("Tags"))
-                    .on_press(Message::ButtonPressed)
+                    .on_press(Message::TagsTogglePressed)
             )
             .push(
                 Container::new(
@@ -164,7 +167,7 @@ impl Application for App {
                     )
                     .width(Length::Fill)
                     .style(stylesheet.clone())
-                    .on_press(Message::Ignore)
+                    .on_press(Message::TableCellPressed(tag_str.into()))
                     .into()  
                 );
 
@@ -175,7 +178,7 @@ impl Application for App {
                     )
                     .width(Length::Fill)
                     .style(stylesheet)
-                    .on_press(Message::Ignore)
+                    .on_press(Message::TableCellPressed(val_str.into()))
                     .into()  
                 )
 

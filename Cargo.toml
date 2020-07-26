@@ -13,6 +13,7 @@ png = "0.16"
 jpeg-decoder = "0.1"
 jpeg2000 = "0.3"
 iced = { version = "0.1", features = ["image", "svg"]}
+clipboard = "0.5"
 
 
 [[bin]]
