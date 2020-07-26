@@ -10,7 +10,7 @@ use iced::{
     Container, Element, Settings, Image, Row,
     Text, Scrollable, scrollable, Button, Column, button,
     Length, HorizontalAlignment, VerticalAlignment, Align,
-    Application, executor, Command, window
+    Application, executor, Command, window, Color, Background
 };
 use iced::image::Handle;
 
@@ -61,7 +61,8 @@ struct App {
     filepath: String,
     table: Vec<(String, String)>,
     scroll_state: scrollable::State,
-    button_state: button::State,
+    show_tags_button_state: button::State,
+    table_buttons_states: Vec<(button::State, button::State)>,
     show_tags: bool
 }
 
@@ -73,7 +74,8 @@ struct Flags {
 
 #[derive(Debug, Clone, Copy)]
 enum Message {
-    ButtonPressed
+    ButtonPressed,
+    Ignore
 }
 
 impl Application for App {
@@ -91,12 +93,17 @@ impl Application for App {
         let Format { h, w, .. } = format;
         let handle = Handle::from_pixels(w, h, bytes);
 
+        let table_buttons_states = table
+            .iter().map(|_| (button::State::new(), button::State::new()))
+            .collect();
+
         let app = App { 
             handle,
             filepath,
             table,
             scroll_state: scrollable::State::new(),
-            button_state: button::State::new(),
+            show_tags_button_state: button::State::new(),
+            table_buttons_states,
             show_tags: false
         };
 
@@ -109,7 +116,8 @@ impl Application for App {
 
     fn update(&mut self, message: Message) -> Command<Self::Message> {
         match message {
-            Message::ButtonPressed => self.show_tags = !self.show_tags
+            Message::ButtonPressed => self.show_tags = !self.show_tags,
+            _ => ()
         }
 
         Command::none()
@@ -121,7 +129,7 @@ impl Application for App {
 
         let header = Row::new()
             .push(
-                Button::new(&mut self.button_state, Text::new("Tags"))
+                Button::new(&mut self.show_tags_button_state, Text::new("Tags"))
                     .on_press(Message::ButtonPressed)
             )
             .push(
@@ -137,15 +145,41 @@ impl Application for App {
 
         let content: Element<Message> = if self.show_tags {
 
-            let tags_col_element: Vec<Element<Message>> = self.table.iter().map(|(tag_str, _)| {
-                Text::new(tag_str)
-                    .into()
-            }).collect();
+            let mut tags_col_element = Vec::<Element<Message>>::new();
+            let mut vals_col_element = Vec::<Element<Message>>::new();
 
-            let vals_col_element: Vec<Element<Message>> = self.table.iter().map(|(_, val_str)| {
-                Text::new(val_str)
-                    .into()
-            }).collect();
+            let iterator = self.table.iter().zip(self.table_buttons_states.iter_mut());
+
+            for (i, ((tag_str, val_str), (tag_state, val_state))) in iterator.enumerate() {
+
+                let stylesheet = match i % 2 {
+                    0 => ButtonStyleSheet::Light,
+                    _ => ButtonStyleSheet::Dark,
+                };
+
+                tags_col_element.push(
+                    Button::new(
+                        tag_state,
+                        Text::new(tag_str)
+                    )
+                    .width(Length::Fill)
+                    .style(stylesheet.clone())
+                    .on_press(Message::Ignore)
+                    .into()  
+                );
+
+                vals_col_element.push(
+                    Button::new(
+                        val_state,
+                        Text::new(val_str)
+                    )
+                    .width(Length::Fill)
+                    .style(stylesheet)
+                    .on_press(Message::Ignore)
+                    .into()  
+                )
+
+            }
 
             let row = Row::new()
                 .push(
@@ -177,6 +211,40 @@ impl Application for App {
     }
 } 
 
+#[derive(Clone)]
+enum ButtonStyleSheet {
+    Light,
+    Dark
+}
+
+
+impl button::StyleSheet for ButtonStyleSheet {
+    fn active(&self) -> button::Style {
+
+        let val = match self {
+            Self::Light => 0.8,
+            Self::Dark => 0.7
+        };
+
+        button::Style {
+            background: Some(Background::Color(
+                Color::from_rgb(val, val, val),
+            )),
+            //text_color: Color::BLACK,
+            ..button::Style::default()
+        }
+    }
+
+    fn hovered(&self) -> button::Style {
+        button::Style {
+            background: Some(Background::Color(
+                Color::from_rgb(1.0, 1.0, 1.0),
+            )),
+            //text_color: Color::BLACK,
+            ..button::Style::default()
+        }
+    }
+}
 
 fn get_dicom_table(dicom: &Dicom) -> Vec<(String, String)> {
     let root = dicom.clone().into_inner();
