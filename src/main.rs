@@ -155,8 +155,7 @@ impl Application for App {
 
         let content: Element<Message> = if self.show_tags {
 
-            let mut tags_col_element = Vec::<Element<Message>>::new();
-            let mut vals_col_element = Vec::<Element<Message>>::new();
+            let mut rows = Vec::<Element<Message>>::new();
 
             let iterator = self.table.iter().zip(self.states.table_buttons.iter_mut());
 
@@ -167,44 +166,42 @@ impl Application for App {
                     _ => ButtonStyleSheet::Dark,
                 };
 
-                tags_col_element.push(
+                let row = Row::with_children(vec![
+
                     Button::new(
                         tag_state,
                         Text::new(tag_str)
+                            .height(Length::Fill)
                     )
-                    .width(Length::Fill)
                     .style(stylesheet.clone())
                     .on_press(Message::TableCellPressed(tag_str.into()))
-                    .into()  
-                );
+                    .width(Length::FillPortion(1))
+                    .into(),
 
-                vals_col_element.push(
                     Button::new(
                         val_state,
                         Text::new(val_str)
+                            .height(Length::Fill)
                     )
-                    .width(Length::Fill)
                     .style(stylesheet)
                     .on_press(Message::TableCellPressed(val_str.into()))
-                    .into()  
-                )
+                    .width(Length::FillPortion(1))
+                    .into()
+
+                ])
+                .width(Length::Fill)
+                .into();
+
+                rows.push(row);
 
             }
 
-            let row = Row::new()
-                .push(
-                    Column::with_children(tags_col_element)
-                        .width(Length::FillPortion(2))
-                )
-                .push(
-                    Column::with_children(vals_col_element)
-                        .width(Length::FillPortion(2))
-                );
+            let col = Column::with_children(rows)
+                .width(Length::Fill);
 
             Scrollable::new(&mut self.states.scroll)
-                .push(row)
+                .push(col)
                 .width(Length::Fill)
-                .height(Length::Shrink)
                 .into()
 
         } else {
@@ -240,7 +237,7 @@ impl button::StyleSheet for ButtonStyleSheet {
             background: Some(Background::Color(
                 Color::from_rgb(val, val, val),
             )),
-            //text_color: Color::BLACK,
+            border_width: 0,
             ..button::Style::default()
         }
     }
@@ -250,7 +247,7 @@ impl button::StyleSheet for ButtonStyleSheet {
             background: Some(Background::Color(
                 Color::from_rgb(1.0, 1.0, 1.0),
             )),
-            //text_color: Color::BLACK,
+            border_width: 0,
             ..button::Style::default()
         }
     }
@@ -309,9 +306,7 @@ fn format_value<P>(value: &Value<MemDicom, P>) -> String {
 
 fn format_primitive(prim_val: &PrimitiveValue) -> String {
 
-    const MAX_LEN: usize = 40;
-
-    let mut s = match prim_val {
+    match prim_val {
 
         PrimitiveValue::Empty => "<empty>".to_owned(),
         PrimitiveValue::Strs(arr) => format_array(arr),
@@ -329,13 +324,7 @@ fn format_primitive(prim_val: &PrimitiveValue) -> String {
         PrimitiveValue::Date(arr) => format_array(arr),
         PrimitiveValue::DateTime(arr) => format_array(arr),
         PrimitiveValue::Time(arr) => format_array(arr)
-    };
-
-    if s.len() > MAX_LEN {
-        s = format!("{} <...>", &s[..MAX_LEN]);
     }
-
-    s
 }
 
 fn format_array<T: Display>(arr: &C<T>) -> String {
