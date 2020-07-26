@@ -9,7 +9,8 @@ use iced::{
     Container, Element, Settings, Image, Row,
     Text, Scrollable, scrollable, Button, Column, button,
     Length, HorizontalAlignment, VerticalAlignment, Align,
-    Application, executor, Command, window, Color, Background
+    Application, executor, Command, window, Color, Background,
+    container
 };
 use iced::image::Handle;
 use clipboard::{ClipboardProvider, ClipboardContext};
@@ -143,45 +144,51 @@ impl Application for App {
 
         let header = Row::new()
             .push(
-                Button::new(&mut self.states.show_tags_button, Text::new("Tags"))
+                Button::new(&mut self.states.show_tags_button, Text::new("Tags").color(Color::WHITE))
                     .on_press(Message::TagsTogglePressed)
+                    .style(TagsButtonStyleSheet)
             )
             .push(
                 Container::new(
                     Text::new(self.filepath.clone())
                         .horizontal_alignment(HorizontalAlignment::Center)
                         .vertical_alignment(VerticalAlignment::Center)
+                        .color(Color::WHITE)
                 )
+                .width(Length::Fill)
                 .padding(5)
+                .center_x()
             )
-            .align_items(Align::Center)
-            .padding(5);
+            .padding(20);
 
         let content: Element<Message> = if self.show_tags {
 
-            let mut rows = Vec::<Element<Message>>::new();
+            const FILL_W: [u16; 3] = [1, 3, 3];
 
+            let mut rows = Vec::<Element<Message>>::new();
             let iterator = self.table.iter().zip(self.states.table_buttons.iter_mut());
 
             for (i, (strings, states)) in iterator.enumerate() {
 
                 let stylesheet = match i % 2 {
-                    0 => ButtonStyleSheet::Light,
-                    _ => ButtonStyleSheet::Dark,
+                    0 => CellButtonStyleSheet::Light,
+                    _ => CellButtonStyleSheet::Dark,
                 };
 
                 let iterator = strings.into_iter().zip(states.into_iter());
 
-                let row = Row::with_children(iterator.map(|(s, state)| {
+                let row = Row::with_children(iterator.enumerate().map(|(x, (s, state))| {
 
                     Button::new(
                         state,
                         Text::new(s)
                             .height(Length::Fill)
+                            .color(Color::WHITE)
+                            .size(16)
                     )
                     .style(stylesheet.clone())
                     .on_press(Message::TableCellPressed(s.clone()))
-                    .width(Length::FillPortion(1))
+                    .width(Length::FillPortion(FILL_W[x]))
                     .into()
 
                 }).collect())
@@ -193,6 +200,7 @@ impl Application for App {
             }
 
             let col = Column::with_children(rows)
+                .spacing(2)
                 .width(Length::Fill);
 
             Scrollable::new(&mut self.states.scroll)
@@ -202,31 +210,36 @@ impl Application for App {
 
         } else {
             Container::new(image)
+                .style(ContainerStyleSheet)
                 .into()
         };
 
-        Column::new()
-            .push(header)
-            .push(content)
-            .align_items(Align::Center)
-            .width(Length::Fill)
-            .into()
+        Container::new(
+            Column::new()
+                .push(header)
+                .push(content)
+                .align_items(Align::Start)
+                .width(Length::Fill)
+        )
+        .style(ContainerStyleSheet)
+        .height(Length::Fill)
+        .into()
     }
 } 
 
 #[derive(Clone)]
-enum ButtonStyleSheet {
+enum CellButtonStyleSheet {
     Light,
     Dark
 }
 
 
-impl button::StyleSheet for ButtonStyleSheet {
+impl button::StyleSheet for CellButtonStyleSheet {
     fn active(&self) -> button::Style {
 
         let val = match self {
-            Self::Light => 0.8,
-            Self::Dark => 0.7
+            Self::Light => 0.2,
+            Self::Dark => 0.1
         };
 
         button::Style {
@@ -241,10 +254,43 @@ impl button::StyleSheet for ButtonStyleSheet {
     fn hovered(&self) -> button::Style {
         button::Style {
             background: Some(Background::Color(
-                Color::from_rgb(1.0, 1.0, 1.0),
+                Color::from_rgb(0.6, 0.6, 0.6),
             )),
             border_width: 0,
             ..button::Style::default()
+        }
+    }
+}
+
+pub struct TagsButtonStyleSheet;
+impl button::StyleSheet for TagsButtonStyleSheet {
+    fn active(&self) -> button::Style {
+        button::Style {
+            background: Some(Background::Color(
+                Color::from_rgb(0.2, 0.2, 0.2),
+            )),
+            border_width: 0,
+            ..button::Style::default()
+        }
+    }
+
+    fn hovered(&self) -> button::Style {
+        button::Style {
+            background: Some(Background::Color(
+                Color::from_rgb(0.6, 0.6, 0.6),
+            )),
+            border_width: 0,
+            ..button::Style::default()
+        }
+    }
+}
+
+pub struct ContainerStyleSheet;
+impl container::StyleSheet for ContainerStyleSheet {
+    fn style(&self) -> container::Style {
+        container::Style {
+            background: Some(Background::Color(Color::BLACK)),
+            ..container::Style::default()
         }
     }
 }
