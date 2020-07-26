@@ -1,6 +1,5 @@
 use std::path::PathBuf;
 use std::fmt::{Debug, Display};
-use dicom::core::Tag;
 use dicom::object::open_file;
 use dicom::object::mem::InMemDicomObject;
 use dicom::core::value::{Value, PrimitiveValue, C};
@@ -58,14 +57,18 @@ pub fn main() {
 }
 
 struct App {
-    handle: Handle,
+    image_handle: Handle,
     filepath: String,
     table: Vec<(String, String)>,
-    scroll_state: scrollable::State,
-    show_tags_button_state: button::State,
-    table_buttons_states: Vec<(button::State, button::State)>,
     show_tags: bool,
-    clipoard: ClipboardContext
+    clipoard: ClipboardContext,
+    states: States
+}
+
+struct States {
+    scroll: scrollable::State,
+    show_tags_button: button::State,
+    table_buttons: Vec<(button::State, button::State)>
 }
 
 struct Flags {
@@ -93,21 +96,25 @@ impl Application for App {
 
         let RawImage { format, bytes } = image_data_bgra;
         let Format { h, w, .. } = format;
-        let handle = Handle::from_pixels(w, h, bytes);
+        let image_handle = Handle::from_pixels(w, h, bytes);
 
         let table_buttons_states = table
             .iter().map(|_| (button::State::new(), button::State::new()))
             .collect();
 
+        let states = States {
+            scroll: scrollable::State::new(),
+            show_tags_button: button::State::new(),
+            table_buttons: table_buttons_states
+        };
+
         let app = App { 
-            handle,
+            image_handle,
             filepath,
             table,
-            scroll_state: scrollable::State::new(),
-            show_tags_button_state: button::State::new(),
-            table_buttons_states,
             show_tags: false,
-            clipoard: clipboard::ClipboardProvider::new().unwrap()
+            clipoard: clipboard::ClipboardProvider::new().unwrap(),
+            states
         };
 
         (app, Command::none())
@@ -128,11 +135,11 @@ impl Application for App {
 
     fn view(&mut self) -> Element<Message> {
 
-        let image = Image::new(self.handle.clone());
+        let image = Image::new(self.image_handle.clone());
 
         let header = Row::new()
             .push(
-                Button::new(&mut self.show_tags_button_state, Text::new("Tags"))
+                Button::new(&mut self.states.show_tags_button, Text::new("Tags"))
                     .on_press(Message::TagsTogglePressed)
             )
             .push(
@@ -141,17 +148,17 @@ impl Application for App {
                         .horizontal_alignment(HorizontalAlignment::Center)
                         .vertical_alignment(VerticalAlignment::Center)
                 )
-                //.padding(5)
+                .padding(5)
             )
-            .align_items(Align::Center);
-            //.padding(5);
+            .align_items(Align::Center)
+            .padding(5);
 
         let content: Element<Message> = if self.show_tags {
 
             let mut tags_col_element = Vec::<Element<Message>>::new();
             let mut vals_col_element = Vec::<Element<Message>>::new();
 
-            let iterator = self.table.iter().zip(self.table_buttons_states.iter_mut());
+            let iterator = self.table.iter().zip(self.states.table_buttons.iter_mut());
 
             for (i, ((tag_str, val_str), (tag_state, val_state))) in iterator.enumerate() {
 
@@ -194,7 +201,7 @@ impl Application for App {
                         .width(Length::FillPortion(2))
                 );
 
-            Scrollable::new(&mut self.scroll_state)
+            Scrollable::new(&mut self.states.scroll)
                 .push(row)
                 .width(Length::Fill)
                 .height(Length::Shrink)
