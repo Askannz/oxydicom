@@ -59,7 +59,7 @@ pub fn main() {
 struct App {
     image_handle: Handle,
     filepath: String,
-    table: Vec<(String, String)>,
+    table: Vec<[String; 3]>,
     show_tags: bool,
     clipoard: ClipboardContext,
     states: States
@@ -68,13 +68,13 @@ struct App {
 struct States {
     scroll: scrollable::State,
     show_tags_button: button::State,
-    table_buttons: Vec<(button::State, button::State)>
+    table_buttons: Vec<[button::State; 3]>
 }
 
 struct Flags {
     filepath: String,
     image: RawImage,
-    table: Vec<(String, String)>
+    table: Vec<[String; 3]>
 }
 
 #[derive(Debug, Clone)]
@@ -99,7 +99,11 @@ impl Application for App {
         let image_handle = Handle::from_pixels(w, h, bytes);
 
         let table_buttons_states = table
-            .iter().map(|_| (button::State::new(), button::State::new()))
+            .iter().map(|_| [
+                button::State::new(),
+                button::State::new(),
+                button::State::new()
+            ])
             .collect();
 
         let states = States {
@@ -159,36 +163,28 @@ impl Application for App {
 
             let iterator = self.table.iter().zip(self.states.table_buttons.iter_mut());
 
-            for (i, ((tag_str, val_str), (tag_state, val_state))) in iterator.enumerate() {
+            for (i, (strings, states)) in iterator.enumerate() {
 
                 let stylesheet = match i % 2 {
                     0 => ButtonStyleSheet::Light,
                     _ => ButtonStyleSheet::Dark,
                 };
 
-                let row = Row::with_children(vec![
+                let iterator = strings.into_iter().zip(states.into_iter());
+
+                let row = Row::with_children(iterator.map(|(s, state)| {
 
                     Button::new(
-                        tag_state,
-                        Text::new(tag_str)
+                        state,
+                        Text::new(s)
                             .height(Length::Fill)
                     )
                     .style(stylesheet.clone())
-                    .on_press(Message::TableCellPressed(tag_str.into()))
-                    .width(Length::FillPortion(1))
-                    .into(),
-
-                    Button::new(
-                        val_state,
-                        Text::new(val_str)
-                            .height(Length::Fill)
-                    )
-                    .style(stylesheet)
-                    .on_press(Message::TableCellPressed(val_str.into()))
+                    .on_press(Message::TableCellPressed(s.clone()))
                     .width(Length::FillPortion(1))
                     .into()
 
-                ])
+                }).collect())
                 .width(Length::Fill)
                 .into();
 
@@ -253,43 +249,52 @@ impl button::StyleSheet for ButtonStyleSheet {
     }
 }
 
-fn get_dicom_table(dicom: &Dicom) -> Vec<(String, String)> {
+fn get_dicom_table(dicom: &Dicom) -> Vec<[String; 3]> {
+
     let root = dicom.clone().into_inner();
-    get_formatted_list(0, &root)
-}
 
-fn get_formatted_list(depth: usize, root: &MemDicom) -> Vec<(String, String)> {
+    fn get_formatted_list(depth: usize, root: &MemDicom) -> Vec<[String; 3]> {
 
-    let dict = StandardDataDictionary;
-    let mut table = Vec::<(String, String)>::new();
+        let dict = StandardDataDictionary;
+        let mut table = Vec::<[String; 3]>::new();
+    
+        let pad_depth = |s: String| format!("{}{}", " ".repeat(4*depth), s);
+    
+        for element in root {
+    
+            let tag_key = element.header().tag;
+    
+            let tag_name_str = dict
+                .by_tag(tag_key.clone())
+                .map(|entry| entry.alias)
+                .unwrap_or("Unknown")
+                .to_owned();
+    
+            let tag_key_str = pad_depth(format!("{}", tag_key));
+            let val_str = format_value(element.value());
+    
+            table.push([tag_key_str, tag_name_str, val_str]);
 
-    let pad_depth = |s: String| format!("{}{}", " ".repeat(4*depth), s);
-
-    for element in root {
-
-        let tag = element.header().tag;
-
-        let tag_name_str = dict
-            .by_tag(tag.clone())
-            .map(|entry| entry.alias)
-            .unwrap_or("Unknown");
-
-        let tag_str = pad_depth(format!("{} {}", tag, tag_name_str));
-        let val_str = format_value(element.value());
-
-        table.push((tag_str, val_str));
-
-        if let Value::Sequence { items, .. } = element.value() {
-            for item in items {
-                table.push((" -".to_owned(), " -".to_owned()));
-                let mut sub_table = get_formatted_list(depth + 1, item);
-                table.append(&mut sub_table);
+            let separator = [
+                " -".to_owned(),
+                " -".to_owned(),
+                " -".to_owned()
+            ];
+    
+            if let Value::Sequence { items, .. } = element.value() {
+                for item in items {
+                    table.push(separator.clone());
+                    let mut sub_table = get_formatted_list(depth + 1, item);
+                    table.append(&mut sub_table);
+                }
+                table.push(separator.clone());
             }
-            table.push((" -".to_owned(), " -".to_owned()));
         }
+    
+        table
     }
 
-    table
+    get_formatted_list(0, &root)
 }
 
 type MemDicom = InMemDicomObject<StandardDataDictionary>;
