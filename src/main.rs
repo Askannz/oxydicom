@@ -19,7 +19,7 @@ use anyhow::{Result, anyhow};
 mod utils;
 mod decoding;
 
-use utils::{Format, RawImage, convert_to_BGRA, Dicom};
+use utils::{Format, RawImage, convert_to_BGRA8888, Dicom};
 use decoding::get_image;
 
 pub fn main() -> Result<()> {
@@ -94,7 +94,7 @@ impl Application for App {
 
         let Flags { filepath, image, table } = flags;
 
-        let image_data_bgra = convert_to_BGRA(&image).unwrap();
+        let image_data_bgra = convert_to_BGRA8888(&image).unwrap();
 
         let RawImage { format, bytes } = image_data_bgra;
         let Format { h, w, .. } = format;
