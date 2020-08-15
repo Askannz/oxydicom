@@ -1,3 +1,4 @@
+use std::convert::TryInto;
 use std::path::Path;
 use std::fs;
 use std::time::Instant;
@@ -35,8 +36,14 @@ fn main() -> Result<()> {
             let RawImage { bytes, .. } = decoded_image_data;
             let t2 = Instant::now();
 
-            let dt1 = ((t1 - t0).as_millis() as f32) / 1000.0;
-            let dt2 = ((t2 - t1).as_millis() as f32) / 1000.0;
+            let dt1: i32 = (t1 - t0).as_millis().try_into()?;
+            let dt2: i32 = (t2 - t1).as_millis().try_into()?;
+
+            let dt1: f64 = dt1.try_into()?;
+            let dt2: f64 = dt2.try_into()?;
+
+            let dt1: f64 = dt1 / 1000.0;
+            let dt2: f64 = dt2 / 1000.0;
 
             println!("  {}", filename);
             println!("    {} bytes", bytes.len());

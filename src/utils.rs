@@ -103,10 +103,7 @@ pub fn convert_to_BGRA8888(image: &RawImage) -> Result<RawImage> {
         3 => u8_bytes
                 .chunks_exact(3)
                 .flat_map(|chunk| {
-                    let [r, g, b] = match chunk {
-                        [r, g, b] => [*r, *g, *b],
-                        _ => panic!()
-                    };
+                    let [r, g, b]: [u8; 3] = chunk.try_into().unwrap();
                     vec![b, g, r, 255]
                 })
                 .collect(),

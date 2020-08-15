@@ -10,7 +10,7 @@ pub fn get_encoded_image_data(dicom: &Dicom) -> Result<EncodedImage> {
     let get_int_value = |tag| match dicom.element(tag)?.value() {
 
         Value::Primitive(primitive_val) => match primitive_val {
-            PrimitiveValue::U16(val) => Ok(val[0] as u32),
+            PrimitiveValue::U16(val) => Ok(val[0].into()),
             _ => return Err(anyhow!("Not U16 data"))
         },
 

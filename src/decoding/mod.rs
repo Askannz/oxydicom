@@ -75,31 +75,29 @@ fn decode_JPEG2000(encoded_image: &EncodedImage) -> Result<Vec<u8>> {
 
 fn map_to_palette(bytes: &Vec<u8>, palettes: &Palettes, channel_depth: u32) -> Result<Vec<u8>> {
 
-    if channel_depth != 1 && channel_depth != 2 {
-        return Err(anyhow!(
+    match channel_depth {
+        1 | 2 => (),
+        _ => return Err(anyhow!(
             "Unsupported bit depth: {} (1 and 2 supported)",
             channel_depth
-        ))  
-    }
+        )) 
+    };
 
-    let d = channel_depth as usize;
+    let d: usize = channel_depth.try_into().unwrap();
     let mapped_bytes: Vec<u8> = bytes
         .chunks_exact(d)
-        .map(|v| match d {
-            1 => u8::from_be_bytes([v[0]]) as usize,
-            2 => u16::from_be_bytes([v[0], v[1]]) as usize,
+        .map(|v| -> usize { match v {
+            [b0] => u8::from_be_bytes([*b0]).into(),
+            [b0, b1] => u16::from_be_bytes([*b0, *b1]).into(),
             _ => panic!()
-        })
+        }})
         .flat_map(|index| {
 
-            let mut px_bytes: Vec<u8> = Vec::new();
-            for i in 0..3 {
-                let [b1, b2] = palettes[i][index].to_be_bytes();
-                px_bytes.push(b1);
-                px_bytes.push(b2);
-            }
-            px_bytes
+            let [r0, r1] = palettes[0][index].to_be_bytes();
+            let [g0, g1] = palettes[1][index].to_be_bytes();
+            let [b0, b1] = palettes[2][index].to_be_bytes();
 
+            vec![r0, r1, g0, g1, b0, b1]
         })
         .collect();
 
@@ -158,9 +156,9 @@ fn decode_header(pixel_data: &Vec<u8>) -> Result<Vec<usize>> {
     let mut offsets = Vec::new();
     let n = std::cmp::min(nb_segments, 16);
     for i in 1..n+1 {
-        let x = (i * 4) as usize;
+        let x = (i * 4).try_into().unwrap();
         let o = u32::from_le_bytes((&pixel_data[x..x+4]).try_into()?);
-        offsets.push(o as usize);
+        offsets.push(o.try_into().unwrap());
     }
 
     Ok(offsets)
@@ -186,14 +184,14 @@ fn decode_segment(segment_data: &[u8]) -> Result<Vec<u8>> {
 
         if header_val > 129 {
 
-            let n = (3 + (255 - header_val)) as usize;
+            let n = (3 + (255 - header_val)).into();
             let rep_byte = segment_data[i];
             decoded_segment.append(&mut vec![rep_byte; n]);
             i += 1;
 
         } else if header_val < 129 {
 
-            let n = header_val as usize;
+            let n: usize = header_val.into();
             if i+n > N { break; }
             decoded_segment.append(&mut segment_data[i..i+n].to_vec());
             i += n;
