@@ -14,6 +14,7 @@ use iced::{
 };
 use iced::image::Handle;
 use clipboard::{ClipboardProvider, ClipboardContext};
+use anyhow::{Result, anyhow};
 
 mod utils;
 mod decoding;
@@ -21,12 +22,12 @@ mod decoding;
 use utils::{Format, RawImage, convert_to_BGRA, Dicom};
 use decoding::get_image;
 
-pub fn main() {
+pub fn main() -> Result<()> {
 
     let mut args = std::env::args().skip(1);
 
     let input_path = PathBuf::from(
-        args.next().expect("Not enough arguments"));
+        args.next().ok_or(anyhow!("You must specify a file to open."))?);
 
     let filepath = input_path.as_os_str().to_str().unwrap().to_owned();
 
@@ -54,7 +55,7 @@ pub fn main() {
         antialiasing: true
     };
 
-    App::run(settings)
+    Ok(App::run(settings))
 }
 
 struct App {
