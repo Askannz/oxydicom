@@ -141,71 +141,17 @@ impl Application for App {
 
         let image = Image::new(self.image_handle.clone());
 
-        let header = Row::new()
-            .push(
-                Button::new(&mut self.states.show_tags_button, Text::new("Tags").color(Color::WHITE))
-                    .on_press(Message::TagsTogglePressed)
-                    .style(ui::TagsButtonStyleSheet)
-            )
-            .push(
-                Container::new(
-                    Text::new(self.filepath.clone())
-                        .horizontal_alignment(HorizontalAlignment::Center)
-                        .vertical_alignment(VerticalAlignment::Center)
-                        .color(Color::WHITE)
-                )
-                .width(Length::Fill)
-                .padding(5)
-                .center_x()
-            )
-            .padding(20);
+        let States {
+            show_tags_button,
+            table_buttons,
+            scroll
+        } = &mut self.states;
+
+        let header = make_header(&self.filepath, show_tags_button);
 
         let content: Element<Message> = if self.show_tags {
 
-            const FILL_W: [u16; 3] = [1, 3, 3];
-
-            let mut rows = Vec::<Element<Message>>::new();
-            let iterator = self.table.iter().zip(self.states.table_buttons.iter_mut());
-
-            for (i, (strings, states)) in iterator.enumerate() {
-
-                let stylesheet = match i % 2 {
-                    0 => ui::CellButtonStyleSheet::Light,
-                    _ => ui::CellButtonStyleSheet::Dark,
-                };
-
-                let iterator = strings.into_iter().zip(states.into_iter());
-
-                let row = Row::with_children(iterator.enumerate().map(|(x, (s, state))| {
-
-                    Button::new(
-                        state,
-                        Text::new(s)
-                            .height(Length::Fill)
-                            .color(Color::WHITE)
-                            .size(16)
-                    )
-                    .style(stylesheet.clone())
-                    .on_press(Message::TableCellPressed(s.clone()))
-                    .width(Length::FillPortion(FILL_W[x]))
-                    .into()
-
-                }).collect())
-                .width(Length::Fill)
-                .into();
-
-                rows.push(row);
-
-            }
-
-            let col = Column::with_children(rows)
-                .spacing(2)
-                .width(Length::Fill);
-
-            Scrollable::new(&mut self.states.scroll)
-                .push(col)
-                .width(Length::Fill)
-                .into()
+            make_tags_content(&self.table, table_buttons, scroll)
 
         } else {
             Container::new(image)
@@ -224,4 +170,83 @@ impl Application for App {
         .height(Length::Fill)
         .into()
     }
-} 
+}
+
+
+fn make_tags_content<'a>(
+    table: &Vec<[String; 3]>,
+    table_buttons: &'a mut Vec<[button::State; 3]>,
+    scroll: &'a mut scrollable::State
+) -> Element<'a, Message> {
+
+    const FILL_W: [u16; 3] = [1, 3, 3];
+
+    let mut rows = Vec::<Element<Message>>::new();
+    let row_iterator = table.iter()
+        .zip(table_buttons.iter_mut())
+        .enumerate();
+
+    for (i, (strings, states)) in row_iterator {
+
+        let stylesheet = match i % 2 {
+            0 => ui::CellButtonStyleSheet::Light,
+            _ => ui::CellButtonStyleSheet::Dark,
+        };
+
+        let col_iterator = strings.into_iter()
+            .zip(states.into_iter())
+            .enumerate();
+
+        let row = Row::with_children(col_iterator.map(|(x, (s, state))| {
+
+            Button::new(
+                state,
+                Text::new(s)
+                    .height(Length::Fill)
+                    .color(Color::WHITE)
+                    .size(16)
+            )
+            .style(stylesheet.clone())
+            .on_press(Message::TableCellPressed(s.clone()))
+            .width(Length::FillPortion(FILL_W[x]))
+            .into()
+
+        }).collect())
+        .width(Length::Fill)
+        .into();
+
+        rows.push(row);
+    }
+
+    let col = Column::with_children(rows)
+        .spacing(2)
+        .width(Length::Fill);
+
+    Scrollable::new(scroll)
+        .push(col)
+        .width(Length::Fill)
+        .into()
+}
+
+
+fn make_header<'a>(filepath: &String, button_state: &'a mut button::State) -> Row<'a, Message> {
+
+    Row::new()
+    .push(
+        Button::new(button_state, Text::new("Tags").color(Color::WHITE))
+            .on_press(Message::TagsTogglePressed)
+            .style(ui::TagsButtonStyleSheet)
+    )
+    .push(
+        Container::new(
+            Text::new(filepath.clone())
+                .horizontal_alignment(HorizontalAlignment::Center)
+                .vertical_alignment(VerticalAlignment::Center)
+                .color(Color::WHITE)
+        )
+        .width(Length::Fill)
+        .padding(5)
+        .center_x()
+    )
+    .padding(20)
+}
