@@ -178,20 +178,20 @@ fn decode_segment(segment_data: &[u8]) -> Result<Vec<u8>> {
             break;
         }
 
-        let header_val = segment_data[i] + 1;
+        let header_val: i16 = Into::<i16>::into(segment_data[i]) + 1i16;
 
         i += 1;
 
         if header_val > 129 {
 
-            let n = (3 + (255 - header_val)).into();
+            let n: usize = (258 - header_val).try_into()?;
             let rep_byte = segment_data[i];
             decoded_segment.append(&mut vec![rep_byte; n]);
             i += 1;
 
         } else if header_val < 129 {
 
-            let n: usize = header_val.into();
+            let n: usize = header_val.try_into()?;
             if i+n > N { break; }
             decoded_segment.append(&mut segment_data[i..i+n].to_vec());
             i += n;
