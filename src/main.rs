@@ -358,7 +358,9 @@ fn format_value<P>(value: &Value<MemDicom, P>) -> String {
 
 fn format_primitive(prim_val: &PrimitiveValue) -> String {
 
-    match prim_val {
+    const MAX_STRING_DISPLAY_LEN: usize = 60;
+
+    let s = match prim_val {
 
         PrimitiveValue::Empty => "<empty>".to_owned(),
         PrimitiveValue::Strs(arr) => format_array(arr),
@@ -376,20 +378,35 @@ fn format_primitive(prim_val: &PrimitiveValue) -> String {
         PrimitiveValue::Date(arr) => format_array(arr),
         PrimitiveValue::DateTime(arr) => format_array(arr),
         PrimitiveValue::Time(arr) => format_array(arr)
+    };
+
+    match s.len() > MAX_STRING_DISPLAY_LEN { 
+        false => s,
+        true => format!("{} <...>", &s[..MAX_STRING_DISPLAY_LEN])
     }
 }
 
 fn format_array<T: Display>(arr: &C<T>) -> String {
 
+    const MAX_ARRAY_DISPLAY_LEN: usize = 8;
+
     match arr.len() {
         0 => "[]".to_owned(),
         1 => format!("{}", arr[0]),
-        _ => {
+        l => {
+
             let repr_list: Vec<String> = arr
                 .iter()
+                .take(MAX_ARRAY_DISPLAY_LEN)
                 .map(|v| format!("{}", v))
                 .collect();
-            repr_list.join(",")
+
+            let s = repr_list.join(",");
+
+            match l > MAX_ARRAY_DISPLAY_LEN { 
+                false => s,
+                true => format!("{},... <{} elements>", s, l)
+            }
         }
     }.trim_end_matches(char::from(0)).to_owned()
 }
