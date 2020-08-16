@@ -93,9 +93,9 @@ fn map_to_palette(bytes: &Vec<u8>, palettes: &Palettes, channel_depth: u32) -> R
         }})
         .flat_map(|index| {
 
-            let [r0, r1] = palettes[0][index].to_be_bytes();
-            let [g0, g1] = palettes[1][index].to_be_bytes();
-            let [b0, b1] = palettes[2][index].to_be_bytes();
+            let [r0, r1] = palettes[0][index].to_le_bytes();
+            let [g0, g1] = palettes[1][index].to_le_bytes();
+            let [b0, b1] = palettes[2][index].to_le_bytes();
 
             vec![r0, r1, g0, g1, b0, b1]
         })
