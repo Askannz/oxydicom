@@ -18,7 +18,7 @@ mod ui;
 
 use utils::{Format, RawImage, convert_to_BGRA8888};
 use decoding::get_image;
-use dicom_table::get_dicom_table;
+use dicom_table::{TableEntry, get_dicom_table};
 
 pub fn main() -> Result<()> {
 
@@ -59,7 +59,7 @@ pub fn main() -> Result<()> {
 struct App {
     image_handle: Handle,
     filepath: String,
-    table: Vec<[String; 3]>,
+    table: Vec<TableEntry>,
     show_tags: bool,
     clipoard: ClipboardContext,
     states: States
@@ -74,13 +74,13 @@ struct States {
 struct Flags {
     filepath: String,
     image: RawImage,
-    table: Vec<[String; 3]>
+    table: Vec<TableEntry>
 }
 
 #[derive(Debug, Clone)]
 enum Message {
     TagsTogglePressed,
-    TableCellPressed(String)
+    TableCellPressed(Option<String>)
 }
 
 impl Application for App {
@@ -131,7 +131,8 @@ impl Application for App {
     fn update(&mut self, message: Message) -> Command<Self::Message> {
         match message {
             Message::TagsTogglePressed => self.show_tags = !self.show_tags,
-            Message::TableCellPressed(txt) => self.clipoard.set_contents(txt).unwrap()
+            Message::TableCellPressed(Some(txt)) => self.clipoard.set_contents(txt).unwrap(),
+            Message::TableCellPressed(None) => ()
         }
 
         Command::none()
@@ -174,7 +175,7 @@ impl Application for App {
 
 
 fn make_tags_content<'a>(
-    table: &Vec<[String; 3]>,
+    table: &Vec<TableEntry>,
     table_buttons: &'a mut Vec<[button::State; 3]>,
     scroll: &'a mut scrollable::State
 ) -> Element<'a, Message> {
@@ -186,29 +187,42 @@ fn make_tags_content<'a>(
         .zip(table_buttons.iter_mut())
         .enumerate();
 
-    for (i, (strings, states)) in row_iterator {
+    for (i, (table_entry, states)) in row_iterator {
 
         let stylesheet = match i % 2 {
             0 => ui::CellButtonStyleSheet::Light,
             _ => ui::CellButtonStyleSheet::Dark,
         };
 
-        let col_iterator = strings.into_iter()
+        let display_values = vec![
+            &table_entry.tag_key,
+            &table_entry.tag_name,
+            &table_entry.short_value
+        ];
+
+        let clipboard_values = vec![
+            Some(table_entry.tag_key.clone()),
+            Some(table_entry.tag_name.clone()),
+            table_entry.value.clone()
+        ];
+
+        let col_iterator = display_values.into_iter()
+            .zip(clipboard_values.into_iter())
             .zip(states.into_iter())
             .enumerate();
 
-        let row = Row::with_children(col_iterator.map(|(x, (s, state))| {
+        let row = Row::with_children(col_iterator.map(|(j, ((disp_val, clip_val), state))| {
 
             Button::new(
                 state,
-                Text::new(s)
+                Text::new(disp_val)
                     .height(Length::Fill)
                     .color(Color::WHITE)
                     .size(16)
             )
             .style(stylesheet.clone())
-            .on_press(Message::TableCellPressed(s.clone()))
-            .width(Length::FillPortion(FILL_W[x]))
+            .on_press(Message::TableCellPressed(clip_val))
+            .width(Length::FillPortion(FILL_W[j]))
             .into()
 
         }).collect())

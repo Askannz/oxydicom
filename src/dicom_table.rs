@@ -6,14 +6,22 @@ use dicom::core::dictionary::DataDictionary;
 
 use crate::utils::Dicom;
 
-pub fn get_dicom_table(dicom: &Dicom) -> Vec<[String; 3]> {
+#[derive(Clone)]
+pub struct TableEntry {
+    pub tag_key: String,
+    pub tag_name: String,
+    pub value: Option<String>,
+    pub short_value: String
+}
+
+pub fn get_dicom_table(dicom: &Dicom) -> Vec<TableEntry> {
 
     let root = dicom.clone().into_inner();
 
-    fn get_formatted_list(depth: usize, root: &MemDicom) -> Vec<[String; 3]> {
+    fn get_formatted_list(depth: usize, root: &MemDicom) -> Vec<TableEntry> {
 
         let dict = StandardDataDictionary;
-        let mut table = Vec::<[String; 3]>::new();
+        let mut table = Vec::<TableEntry>::new();
     
         let pad_depth = |s: String| format!("{}{}", " ".repeat(4*depth), s);
     
@@ -28,15 +36,23 @@ pub fn get_dicom_table(dicom: &Dicom) -> Vec<[String; 3]> {
                 .to_owned();
     
             let tag_key_str = pad_depth(format!("{}", tag_key));
-            let val_str = format_value(element.value());
-    
-            table.push([tag_key_str, tag_name_str, val_str]);
+            let (short_value, value) = format_value(element.value());
 
-            let separator = [
-                " -".to_owned(),
-                " -".to_owned(),
-                " -".to_owned()
-            ];
+            let table_entry = TableEntry {
+                tag_key: tag_key_str,
+                tag_name: tag_name_str,
+                value,
+                short_value
+            };
+    
+            table.push(table_entry);
+
+            let separator = TableEntry {
+                tag_key: "-".into(),
+                tag_name: "-".into(),
+                value: None,
+                short_value: "-".into()
+            };
     
             if let Value::Sequence { items, .. } = element.value() {
                 for item in items {
@@ -56,21 +72,21 @@ pub fn get_dicom_table(dicom: &Dicom) -> Vec<[String; 3]> {
 
 type MemDicom = InMemDicomObject<StandardDataDictionary>;
 
-fn format_value<P>(value: &Value<MemDicom, P>) -> String {
+fn format_value<P>(value: &Value<MemDicom, P>) -> (String, Option<String>) {
 
     match value {
 
         Value::Primitive(prim_val) => format_primitive(prim_val),
-        Value::Sequence { .. } => "<sequence>".to_owned(),
-        Value::PixelSequence { .. } => "<pixel sequence>".to_owned()
+        Value::Sequence { .. } => ("<sequence>".to_owned(), None),
+        Value::PixelSequence { .. } => ("<pixel sequence>".to_owned(), None)
     }
 }
 
-fn format_primitive(prim_val: &PrimitiveValue) -> String {
+fn format_primitive(prim_val: &PrimitiveValue) -> (String, Option<String>) {
 
     const MAX_STRING_DISPLAY_LEN: usize = 60;
 
-    let s = match prim_val {
+    let value = match prim_val {
 
         PrimitiveValue::Empty => "<empty>".to_owned(),
         PrimitiveValue::Strs(arr) => format_array(arr),
@@ -90,20 +106,22 @@ fn format_primitive(prim_val: &PrimitiveValue) -> String {
         PrimitiveValue::Time(arr) => format_array(arr)
     };
 
-    match s.len() > MAX_STRING_DISPLAY_LEN { 
-        false => s,
-        true => format!("{} <...>", &s[..MAX_STRING_DISPLAY_LEN])
-    }
+    let short_value = match value.len() > MAX_STRING_DISPLAY_LEN { 
+        false => value.clone(),
+        true => format!("{} <...>", &value[..MAX_STRING_DISPLAY_LEN])
+    };
+
+    (short_value, Some(value))
 }
 
 fn format_array<T: Display>(arr: &C<T>) -> String {
 
-    const MAX_ARRAY_DISPLAY_LEN: usize = 8;
+    const MAX_ARRAY_DISPLAY_LEN: usize = 5;
 
     match arr.len() {
         0 => "[]".to_owned(),
         1 => format!("{}", arr[0]),
-        l => {
+        _ => {
 
             let repr_list: Vec<String> = arr
                 .iter()
@@ -111,12 +129,7 @@ fn format_array<T: Display>(arr: &C<T>) -> String {
                 .map(|v| format!("{}", v))
                 .collect();
 
-            let s = repr_list.join(",");
-
-            match l > MAX_ARRAY_DISPLAY_LEN { 
-                false => s,
-                true => format!("{},... <{} elements>", s, l)
-            }
+            repr_list.join(",")
         }
     }.trim_end_matches(char::from(0)).to_owned()
 } 
