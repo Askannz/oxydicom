@@ -232,9 +232,19 @@ fn make_tags_content<'a>(
         rows.push(row);
     }
 
-    let col = Column::with_children(rows)
+    let tags_col = Column::with_children(rows)
         .spacing(2)
         .width(Length::Fill);
+
+    let col = Column::with_children(vec![
+        Text::new("Click a cell to copy to clipboard")
+            .color(Color::WHITE)
+            .horizontal_alignment(HorizontalAlignment::Center)
+            .vertical_alignment(VerticalAlignment::Center)
+            .into(),
+        tags_col.into()
+    ])
+    .align_items(Align::Center);
 
     Scrollable::new(scroll)
         .push(col)
