@@ -5,7 +5,7 @@ authors = ["Robin Lange <robin.langenc@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-dicom = "0.2"
+dicom = "0.3"
 anyhow = "1.0"
 png = "0.16"
 jpeg-decoder = "0.1"

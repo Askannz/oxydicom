@@ -578,9 +578,9 @@ dependencies = [
 
 [[package]]
 name = "dicom"
-version = "0.2.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "907d60ad016f0cfdb4c63eae98b74d08e2c8566b9458862097fddb671176cf7d"
+checksum = "11de96b9b7649fe1f4a2dc0c88ca13ae94bdb1e6379c9cafc2c77924ad8a8f69"
 dependencies = [
  "dicom-core",
  "dicom-dictionary-std",
@@ -592,21 +592,23 @@ dependencies = [
 
 [[package]]
 name = "dicom-core"
-version = "0.2.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "970753d93651f7395380b11a45380424318f88d2857e020ddd4810cf42a4f381"
+checksum = "bb460db76427c56d32059a54cfd43ce5a45baf46ba4c78063047885a7c49a5ee"
 dependencies = [
  "chrono",
  "itertools",
- "quick-error",
+ "num-traits",
+ "safe-transmute",
  "smallvec 1.4.0",
+ "snafu",
 ]
 
 [[package]]
 name = "dicom-dictionary-std"
-version = "0.2.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "27d20f45d40aa600d567087d7155adba9e28bfffdf73dbda7d2c6e5b511f26e9"
+checksum = "3f3a5953239eaf4cf07402ab56a251de9a6f50c583dfbb88f2d06ca03dde375a"
 dependencies = [
  "dicom-core",
  "lazy_static",
@@ -614,23 +616,23 @@ dependencies = [
 
 [[package]]
 name = "dicom-encoding"
-version = "0.2.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a3a1f850a6e3fbf30595364d7ad87303a5f80d92feba20b68a2af6af9517517f"
+checksum = "9a46688d1b9ebcb6cf655612c2d42b6c80998dfff339b1e5b3ea9feac9d213d5"
 dependencies = [
  "byteordered",
  "dicom-core",
  "dicom-dictionary-std",
  "encoding",
  "inventory",
- "quick-error",
+ "snafu",
 ]
 
 [[package]]
 name = "dicom-object"
-version = "0.2.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e8e0642d10827b4d052dea2912e2650c20846577219885763b200c438fdebeec"
+checksum = "a2555771a2fa7a0c7391e12059f2897a0449eb983d7cf992957377c6009a236d"
 dependencies = [
  "byteordered",
  "dicom-core",
@@ -640,27 +642,28 @@ dependencies = [
  "dicom-transfer-syntax-registry",
  "itertools",
  "smallvec 1.4.0",
+ "snafu",
 ]
 
 [[package]]
 name = "dicom-parser"
-version = "0.2.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f54bac6dcf9db48fd6a6c462ba154eafc406d1217e38dddd07ae1daf8abfc10"
+checksum = "942a0fe83e3785ec15198abde1f4c2b5ab699a8c010f6deea3d2974df3f631bf"
 dependencies = [
  "chrono",
  "dicom-core",
  "dicom-dictionary-std",
  "dicom-encoding",
- "quick-error",
  "smallvec 1.4.0",
+ "snafu",
 ]
 
 [[package]]
 name = "dicom-transfer-syntax-registry"
-version = "0.2.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5cb442efb795dd3b41cd928d771a5c0099f5d905e81fd416bc7ae92b41868844"
+checksum = "973dc09b686aaf8a6e63aa9335352a900b1fa93d1a788ab2eaea55941944af71"
 dependencies = [
  "byteordered",
  "dicom-core",
@@ -695,6 +698,12 @@ checksum = "b11f15d1e3268f140f68d390637d5e76d849782d971ae7063e0da69fe9709a76"
 dependencies = [
  "libloading 0.6.2",
 ]
+
+[[package]]
+name = "doc-comment"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fea41bba32d969b513997752735605054bc0dfa92b4c56bf1189f2e174be7a10"
 
 [[package]]
 name = "dodrio"
@@ -1482,9 +1491,9 @@ dependencies = [
 
 [[package]]
 name = "itertools"
-version = "0.8.2"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f56a2d0bc861f9165be4eb3442afd3c236d8a98afd426f65d92324ae1091a484"
+checksum = "284f18f85651fe11e8a991b2adb42cb078325c996ed026d994719efcfca1d54b"
 dependencies = [
  "either",
 ]
@@ -2458,6 +2467,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "safe-transmute"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "50b8b2cd387f744f69469aaed197954ba4c0ecdb31e02edf99b023e0df11178a"
+
+[[package]]
 name = "same-file"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2612,6 +2627,27 @@ checksum = "4a59486e68b5596f664deedf01c46297f4af60379adae20175357a814d40f69e"
 dependencies = [
  "nix",
  "smithay-client-toolkit",
+]
+
+[[package]]
+name = "snafu"
+version = "0.6.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9c4e6046e4691afe918fd1b603fd6e515bcda5388a1092a9edbada307d159f09"
+dependencies = [
+ "doc-comment",
+ "snafu-derive",
+]
+
+[[package]]
+name = "snafu-derive"
+version = "0.6.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7073448732a89f2f3e6581989106067f403d378faeafb4a50812eb814170d3e5"
+dependencies = [
+ "proc-macro2 1.0.18",
+ "quote 1.0.7",
+ "syn 1.0.33",
 ]
 
 [[package]]
